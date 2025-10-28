@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
-import { Client } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { db } from '../../config/database';
 import { users } from '../../models/schema';
 import { eq } from 'drizzle-orm';
 import { hash, compare } from 'bcrypt';
@@ -8,28 +7,9 @@ import { sign } from 'jsonwebtoken';
 
 const app = new Hono();
 
-// Fungsi untuk membuat koneksi database baru
-const createDBConnection = async () => {
-  const client = new Client({
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "5432"),
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "root",
-    database: process.env.DB_NAME || "restodb",
-    ssl: false, // Disable SSL for local development
-  });
-
-  await client.connect();
-  return drizzle(client);
-};
-
 // POST /api/v1/admin/login - Endpoint untuk login admin
-app.post('/login', async (c) => {
-  let client;
+app.post('/', async (c) => {
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const { username, password } = await c.req.json();
 
     // Validasi input
@@ -88,11 +68,6 @@ app.post('/login', async (c) => {
       message: 'Terjadi kesalahan saat login',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 

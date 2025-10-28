@@ -1,33 +1,14 @@
 import { Hono } from 'hono';
-import { Client } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { db } from '../../config/database';
 import { orders, orderItems, menuItems, payments } from '../../models/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 
 const app = new Hono();
 
-// Fungsi untuk membuat koneksi database baru
-const createDBConnection = async () => {
-  const client = new Client({
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "5432"),
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "root",
-    database: process.env.DB_NAME || "restodb",
-    ssl: false, // Disable SSL for local development
-  });
-
-  await client.connect();
-  return drizzle(client);
-};
 
 // GET /api/v1/admin/orders - Mendapatkan semua pesanan
 app.get('/', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const orderList = await db
       .select()
       .from(orders)
@@ -74,21 +55,12 @@ app.get('/', async (c) => {
       message: 'Gagal mengambil daftar pesanan',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 
 // POST /api/v1/admin/orders/scan - Mendapatkan detail pesanan berdasarkan order UID
 app.post('/scan', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const { order_uid } = await c.req.json();
 
     // Validasi input
@@ -154,21 +126,12 @@ app.post('/scan', async (c) => {
       message: 'Gagal mengambil detail pesanan',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 
 // PUT /api/v1/admin/orders/:id/confirm-payment - Konfirmasi pembayaran tunai
 app.put('/:id/confirm-payment', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const id = parseInt(c.req.param('id'));
 
     // Cek apakah pesanan ada
@@ -188,7 +151,7 @@ app.put('/:id/confirm-payment', async (c) => {
     await db
       .update(orders)
       .set({ 
-        status: 'menunggu_konfirmasi', // Sesuaikan dengan status yang sesuai dalam workflow
+        status: 'dikonfirmasi', // Perbaikan: untuk pembayaran tunai, ubah langsung ke 'dikonfirmasi'
       })
       .where(eq(orders.id, id));
 
@@ -203,21 +166,94 @@ app.put('/:id/confirm-payment', async (c) => {
       message: 'Gagal mengkonfirmasi pembayaran',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
+  }
+});
+
+// GET /api/v1/admin/orders/:id - Mendapatkan detail pesanan berdasarkan ID
+app.get('/:id', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'));
+
+    // Cari pesanan berdasarkan ID
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, id))
+      .limit(1);
+
+    if (!order) {
+      return c.json({
+        success: false,
+        message: 'Pesanan tidak ditemukan'
+      }, 404);
     }
+
+    // Ambil item pesanan
+    const orderItemsResult = await db
+      .select({
+        id: orderItems.id,
+        quantity: orderItems.quantity,
+        priceAtOrder: orderItems.priceAtOrder,
+        menuItemId: orderItems.menuItemId,
+        menuItemName: menuItems.name,
+        menuItemDescription: menuItems.description,
+        menuItemPrice: menuItems.price,
+        menuItemCategory: menuItems.category,
+        menuItemImageUrl: menuItems.imageUrl
+      })
+      .from(orderItems)
+      .innerJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+      .where(eq(orderItems.orderId, order.id));
+
+    // Ambil informasi pembayaran terkait
+    const [payment] = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.orderId, order.id));
+
+    // Bangun response dengan detail pesanan dan itemnya
+    const orderDetails = {
+      id: order.id,
+      order_uid: order.orderUid,
+      status: order.status,
+      total_amount: order.totalAmount,
+      payment_method: order.paymentMethod,
+      table_number: order.tableNumber,
+      created_at: order.createdAt,
+      items: orderItemsResult.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        price_at_order: item.priceAtOrder,
+        menu_item: {
+          id: item.menuItemId,
+          name: item.menuItemName,
+          description: item.menuItemDescription,
+          price: item.menuItemPrice,
+          category: item.menuItemCategory,
+          image_url: item.menuItemImageUrl
+        }
+      })),
+      payment: payment || null
+    };
+
+    return c.json({
+      success: true,
+      data: orderDetails,
+      message: 'Detail pesanan berhasil diambil'
+    });
+  } catch (error) {
+    console.error('Error retrieving order details:', error);
+    return c.json({
+      success: false,
+      message: 'Gagal mengambil detail pesanan',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
 });
 
 // PUT /api/v1/admin/orders/:id/status - Update status pesanan
 app.put('/:id/status', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const id = parseInt(c.req.param('id'));
     const { status } = await c.req.json();
 
@@ -277,11 +313,6 @@ app.put('/:id/status', async (c) => {
       message: 'Gagal memperbarui status pesanan',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 

@@ -1,0 +1,159 @@
+# File ini berisi kumpulan request untuk menguji API Restoran sesuai dengan implementasi terbaru
+
+# Variabel Umum
+@base_url = http://localhost:3000
+
+### Register Admin
+# Endpoint: POST /api/v1/admin/register
+POST {{base_url}}/api/v1/admin/register HTTP/1.1
+Content-Type: application/json
+
+{
+  "username": "newadmin",
+  "password": "password123",
+  "role": "admin"
+}
+
+> {%
+  client.global.set("new_auth_token", response.body.data.token);
+%}
+
+### Login Admin
+# Endpoint: POST /api/v1/admin/login
+POST {{base_url}}/api/v1/admin/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "username": "newadmin",
+  "password": "password123"
+}
+
+> {%
+  client.global.set("auth_token", response.body.data.token);
+%}
+
+### Mendapatkan Semua Menu (Publik)
+# Endpoint: GET /api/v1/menu
+GET {{base_url}}/api/v1/menu HTTP/1.1
+
+### Validasi Lokasi Pelanggan
+# Endpoint: POST /api/v1/location-check
+POST {{base_url}}/api/v1/location-check HTTP/1.1
+Content-Type: application/json
+
+{
+  "lat": -6.200000,
+  "long": 106.816666
+}
+
+### Membuat Pesanan Baru
+# Endpoint: POST /api/v1/orders
+POST {{base_url}}/api/v1/orders HTTP/1.1
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "menu_item_id": 5,
+      "quantity": 2
+    }
+  ],
+  "payment_method": "cash",
+  "table_number": 5
+}
+
+### Mendapatkan Status Pesanan
+# Endpoint: GET /api/v1/orders/:order_uid
+GET {{base_url}}/api/v1/orders/{{order_uid}} HTTP/1.1
+
+# Gunakan variabel untuk menyimpan order_uid dari response sebelumnya
+@order_uid = 893f504b-1fb2-475d-bd68-c34e604d5b6b
+
+### Mendapatkan Semua Menu (Admin)
+# Endpoint: GET /api/v1/admin/menu
+GET {{base_url}}/api/v1/admin/menu HTTP/1.1
+Authorization: Bearer {{auth_token}}
+
+@auth_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsInVzZXJuYW1lIjoibmV3YWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjE2MTM3MTMsImV4cCI6MTc2MTcwMDExM30.8I3seALxZhrGu0C50uBjiFyqYbMtF8rFQzg7KZCM0xY
+
+### Menambahkan Menu Baru (Admin)
+# Endpoint: POST /api/v1/admin/menu
+POST {{base_url}}/api/v1/admin/menu HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "name": "Nasi Goreng Ati Amela",
+  "description": "Nasi goreng dengan topping ati ampela",
+  "price": "25000",
+  "category": "Makanan",
+  "image_url": "https://example.com/nasi-goreng.jpg",
+  "is_available": true
+}
+
+### Memperbarui Menu (Admin)
+# Endpoint: PUT /api/v1/admin/menu/:id
+PUT {{base_url}}/api/v1/admin/menu/1 HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "name": "Nasi Goreng Super Spesial",
+  "price": "29000",
+  "is_available": true
+}
+
+### Update Status Ketersediaan Menu (Admin)
+# Endpoint: PUT /api/v1/admin/menu/:id/availability
+PUT {{base_url}}/api/v1/admin/menu/2/availability HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "is_available": false
+}
+
+### Menghapus Menu (Admin) - Hanya jika tidak digunakan dalam pesanan
+# Endpoint: DELETE /api/v1/admin/menu/:id
+DELETE {{base_url}}/api/v1/admin/menu/11 HTTP/1.1
+Authorization: Bearer {{auth_token}}
+
+### Dashboard Pesanan (Admin)
+# Endpoint: GET /api/v1/admin/orders
+GET {{base_url}}/api/v1/admin/orders HTTP/1.1
+Authorization: Bearer {{auth_token}}
+
+### Mendapatkan Detail Pesanan Berdasarkan UID (Admin)
+# Endpoint: POST /api/v1/admin/orders/scan
+POST {{base_url}}/api/v1/admin/orders/scan HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "order_uid": "893f504b-1fb2-475d-bd68-c34e604d5b6b"
+}
+
+
+### Konfirmasi Pembayaran Tunai (Admin)
+# Endpoint: PUT /api/v1/admin/orders/:id/confirm-payment
+# Catatan: Endpoint ini akan mengupdate status pesanan ke 'dikonfirmasi' untuk pembayaran tunai
+PUT {{base_url}}/api/v1/admin/orders/10/confirm-payment HTTP/1.1
+Authorization: Bearer {{auth_token}}
+
+### Update Status Pesanan (Admin)
+# Endpoint: PUT /api/v1/admin/orders/:id/status
+PUT {{base_url}}/api/v1/admin/orders/10/status HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "status": "sedang_dipersiapkan"
+}
+
+# Status valid yang bisa digunakan:
+# 'menunggu_pembayaran', 'menunggu_konfirmasi', 'dikonfirmasi', 'sedang_dipersiapkan', 'siap_diambil', 'selesai', 'dibatalkan'
+
+### Mendapatkan Detail Pesanan Berdasarkan ID (Admin)
+# Endpoint: GET /api/v1/admin/orders/:id
+GET {{base_url}}/api/v1/admin/orders/10 HTTP/1.1
+Authorization: Bearer {{auth_token}}

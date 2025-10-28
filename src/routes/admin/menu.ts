@@ -1,33 +1,13 @@
 import { Hono } from 'hono';
-import { Client } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { menuItems } from '../../models/schema';
+import { db } from '../../config/database';
+import { menuItems, orderItems } from '../../models/schema';
 import { eq, desc } from 'drizzle-orm';
 
 const app = new Hono();
 
-// Fungsi untuk membuat koneksi database baru
-const createDBConnection = async () => {
-  const client = new Client({
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "5432"),
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "root",
-    database: process.env.DB_NAME || "restodb",
-    ssl: false, // Disable SSL for local development
-  });
-
-  await client.connect();
-  return drizzle(client);
-};
-
 // GET /api/v1/admin/menu - Mendapatkan semua item menu
 app.get('/', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const menuList = await db
       .select()
       .from(menuItems)
@@ -45,21 +25,12 @@ app.get('/', async (c) => {
       message: 'Gagal mengambil daftar menu',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 
 // POST /api/v1/admin/menu - Membuat item menu baru
 app.post('/', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const { name, description, price, category, image_url, is_available } = await c.req.json();
 
     // Validasi input
@@ -103,21 +74,12 @@ app.post('/', async (c) => {
       message: 'Gagal menambahkan item menu',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 
 // PUT /api/v1/admin/menu/:id - Mengupdate item menu
 app.put('/:id', async (c) => {
-  let client;
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
     const id = parseInt(c.req.param('id'));
     const { name, description, price, category, image_url, is_available } = await c.req.json();
 
@@ -170,21 +132,60 @@ app.put('/:id', async (c) => {
       message: 'Gagal memperbarui item menu',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 
-// DELETE /api/v1/admin/menu/:id - Menghapus item menu
-app.delete('/:id', async (c) => {
-  let client;
+// PUT /api/v1/admin/menu/:id/availability - Memperbarui status ketersediaan item menu
+app.put('/:id/availability', async (c) => {
   try {
-    const db = await createDBConnection();
-    client = db.session.client;
-    
+    const id = parseInt(c.req.param('id'));
+    const { is_available } = await c.req.json();
+
+    // Validasi input
+    if (is_available === undefined) {
+      return c.json({
+        success: false,
+        message: 'Status ketersediaan harus disertakan (is_available)'
+      }, 400);
+    }
+
+    // Cek apakah item menu ada
+    const [existingItem] = await db
+      .select()
+      .from(menuItems)
+      .where(eq(menuItems.id, id));
+
+    if (!existingItem) {
+      return c.json({
+        success: false,
+        message: 'Item menu tidak ditemukan'
+      }, 404);
+    }
+
+    // Update status ketersediaan
+    await db
+      .update(menuItems)
+      .set({ isAvailable: Boolean(is_available) })
+      .where(eq(menuItems.id, id));
+
+    const statusText = Boolean(is_available) ? 'tersedia' : 'tidak tersedia';
+    return c.json({
+      success: true,
+      message: `Status ketersediaan item menu berhasil diperbarui menjadi ${statusText}`
+    });
+  } catch (error) {
+    console.error('Error updating menu item availability:', error);
+    return c.json({
+      success: false,
+      message: 'Gagal memperbarui status ketersediaan item menu',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+// DELETE /api/v1/admin/menu/:id - Menghapus item menu secara permanen
+app.delete('/:id', async (c) => {
+  try {
     const id = parseInt(c.req.param('id'));
 
     // Cek apakah item menu ada
@@ -198,6 +199,20 @@ app.delete('/:id', async (c) => {
         success: false,
         message: 'Item menu tidak ditemukan'
       }, 404);
+    }
+
+    // Cek apakah item menu sedang digunakan dalam pesanan
+    const usageCheck = await db
+      .select()
+      .from(orderItems)
+      .where(eq(orderItems.menuItemId, id))
+      .limit(1);
+
+    if (usageCheck.length > 0) {
+      return c.json({
+        success: false,
+        message: 'Tidak dapat menghapus item menu karena sedang digunakan dalam pesanan'
+      }, 400);
     }
 
     // Hapus item menu
@@ -216,11 +231,6 @@ app.delete('/:id', async (c) => {
       message: 'Gagal menghapus item menu',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
-  } finally {
-    // Tutup koneksi setelah selesai
-    if (client) {
-      await client.end();
-    }
   }
 });
 

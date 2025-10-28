@@ -11,15 +11,19 @@ const client = new Client({
   ssl: false, // Disable SSL for local development
 });
 
+// Create drizzle instance using the client
+const db = drizzle(client);
+
 export const connectDB = async () => {
   try {
     await client.connect();
     console.log("Database connected successfully");
-    return drizzle(client);
+    return db;
   } catch (error) {
     console.error("Database connection error:", error);
     throw error;
   }
 };
 
+export { db };
 export default client;
