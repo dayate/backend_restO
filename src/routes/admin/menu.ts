@@ -2,16 +2,24 @@ import { Hono } from 'hono';
 import { db } from '../../config/database';
 import { menuItems, orderItems } from '../../models/schema';
 import { eq, desc } from 'drizzle-orm';
+import logger from '../../utils/logger';
 
 const app = new Hono();
 
 // GET /api/v1/admin/menu - Mendapatkan semua item menu
 app.get('/', async (c) => {
   try {
+    logger.info('Mengambil semua item menu (admin)');
+    
     const menuList = await db
       .select()
       .from(menuItems)
       .orderBy(desc(menuItems.createdAt));
+    
+    logger.info({
+      msg: 'Berhasil mengambil daftar menu',
+      count: menuList.length
+    });
     
     return c.json({
       success: true,
@@ -19,7 +27,11 @@ app.get('/', async (c) => {
       message: 'Daftar menu berhasil diambil'
     });
   } catch (error) {
-    console.error('Error retrieving menu items:', error);
+    logger.error({
+      msg: 'Error retrieving menu items (admin)',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
     return c.json({
       success: false,
       message: 'Gagal mengambil daftar menu',
@@ -33,8 +45,20 @@ app.post('/', async (c) => {
   try {
     const { name, description, price, category, image_url, is_available } = await c.req.json();
 
+    logger.info({
+      msg: 'Membuat item menu baru',
+      name,
+      price
+    });
+
     // Validasi input
     if (!name || !price) {
+      logger.warn({
+        msg: 'Validasi gagal: Nama dan harga harus diisi',
+        name,
+        price
+      });
+      
       return c.json({
         success: false,
         message: 'Nama dan harga harus diisi'
@@ -43,6 +67,11 @@ app.post('/', async (c) => {
 
     // Validasi tipe data
     if (typeof price !== 'string' && typeof price !== 'number') {
+      logger.warn({
+        msg: 'Validasi gagal: Harga harus berupa angka',
+        price
+      });
+      
       return c.json({
         success: false,
         message: 'Harga harus berupa angka'
@@ -62,13 +91,23 @@ app.post('/', async (c) => {
       })
       .returning();
 
+    logger.info({
+      msg: 'Item menu berhasil ditambahkan',
+      id: newMenuItem.id,
+      name: newMenuItem.name
+    });
+
     return c.json({
       success: true,
       data: newMenuItem,
       message: 'Item menu berhasil ditambahkan'
     }, 201);
   } catch (error) {
-    console.error('Error creating menu item:', error);
+    logger.error({
+      msg: 'Error creating menu item',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
     return c.json({
       success: false,
       message: 'Gagal menambahkan item menu',
@@ -83,6 +122,13 @@ app.put('/:id', async (c) => {
     const id = parseInt(c.req.param('id'));
     const { name, description, price, category, image_url, is_available } = await c.req.json();
 
+    logger.info({
+      msg: 'Memperbarui item menu',
+      id,
+      name,
+      price
+    });
+
     // Cek apakah item menu ada
     const [existingItem] = await db
       .select()
@@ -90,6 +136,11 @@ app.put('/:id', async (c) => {
       .where(eq(menuItems.id, id));
 
     if (!existingItem) {
+      logger.warn({
+        msg: 'Item menu tidak ditemukan',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Item menu tidak ditemukan'
@@ -99,6 +150,11 @@ app.put('/:id', async (c) => {
     // Validasi minimal input
     if (name === undefined && description === undefined && price === undefined && 
         category === undefined && image_url === undefined && is_available === undefined) {
+      logger.warn({
+        msg: 'Tidak ada data yang diperbarui',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Tidak ada data yang diperbarui'
@@ -120,13 +176,24 @@ app.put('/:id', async (c) => {
       .where(eq(menuItems.id, id))
       .returning();
 
+    logger.info({
+      msg: 'Item menu berhasil diperbarui',
+      id: updatedItem.id,
+      name: updatedItem.name
+    });
+
     return c.json({
       success: true,
       data: updatedItem,
       message: 'Item menu berhasil diperbarui'
     });
   } catch (error) {
-    console.error('Error updating menu item:', error);
+    logger.error({
+      msg: 'Error updating menu item',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      id: c.req.param('id')
+    });
+    
     return c.json({
       success: false,
       message: 'Gagal memperbarui item menu',
@@ -141,8 +208,19 @@ app.put('/:id/availability', async (c) => {
     const id = parseInt(c.req.param('id'));
     const { is_available } = await c.req.json();
 
+    logger.info({
+      msg: 'Memperbarui status ketersediaan item menu',
+      id,
+      is_available
+    });
+
     // Validasi input
     if (is_available === undefined) {
+      logger.warn({
+        msg: 'Status ketersediaan harus disertakan (is_available)',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Status ketersediaan harus disertakan (is_available)'
@@ -156,6 +234,11 @@ app.put('/:id/availability', async (c) => {
       .where(eq(menuItems.id, id));
 
     if (!existingItem) {
+      logger.warn({
+        msg: 'Item menu tidak ditemukan',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Item menu tidak ditemukan'
@@ -169,12 +252,25 @@ app.put('/:id/availability', async (c) => {
       .where(eq(menuItems.id, id));
 
     const statusText = Boolean(is_available) ? 'tersedia' : 'tidak tersedia';
+    
+    logger.info({
+      msg: 'Status ketersediaan item menu berhasil diperbarui',
+      id,
+      status: statusText
+    });
+    
     return c.json({
       success: true,
       message: `Status ketersediaan item menu berhasil diperbarui menjadi ${statusText}`
     });
   } catch (error) {
-    console.error('Error updating menu item availability:', error);
+    logger.error({
+      msg: 'Error updating menu item availability',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      id: c.req.param('id'),
+      is_available
+    });
+    
     return c.json({
       success: false,
       message: 'Gagal memperbarui status ketersediaan item menu',
@@ -188,6 +284,11 @@ app.delete('/:id', async (c) => {
   try {
     const id = parseInt(c.req.param('id'));
 
+    logger.info({
+      msg: 'Menghapus item menu',
+      id
+    });
+
     // Cek apakah item menu ada
     const [existingItem] = await db
       .select()
@@ -195,6 +296,11 @@ app.delete('/:id', async (c) => {
       .where(eq(menuItems.id, id));
 
     if (!existingItem) {
+      logger.warn({
+        msg: 'Item menu tidak ditemukan',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Item menu tidak ditemukan'
@@ -209,6 +315,11 @@ app.delete('/:id', async (c) => {
       .limit(1);
 
     if (usageCheck.length > 0) {
+      logger.warn({
+        msg: 'Tidak dapat menghapus item menu karena sedang digunakan dalam pesanan',
+        id
+      });
+      
       return c.json({
         success: false,
         message: 'Tidak dapat menghapus item menu karena sedang digunakan dalam pesanan'
@@ -220,12 +331,22 @@ app.delete('/:id', async (c) => {
       .delete(menuItems)
       .where(eq(menuItems.id, id));
 
+    logger.info({
+      msg: 'Item menu berhasil dihapus',
+      id
+    });
+
     return c.json({
       success: true,
       message: 'Item menu berhasil dihapus'
     });
   } catch (error) {
-    console.error('Error deleting menu item:', error);
+    logger.error({
+      msg: 'Error deleting menu item',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      id: c.req.param('id')
+    });
+    
     return c.json({
       success: false,
       message: 'Gagal menghapus item menu',

@@ -28,9 +28,9 @@ Backend aplikasi pemesanan makanan telah selesai diimplementasikan melalui 8 sub
 - Membuat endpoint untuk pembuatan dan pengecekan pesanan
 
 ## Fase 1.6: Implementasi Endpoint Pembayaran Backend
-- Membuat endpoint pembuatan transaksi QRIS melalui Midtrans
-- Mengimplementasikan endpoint webhook untuk notifikasi pembayaran
-- Menghubungkan proses pembayaran dengan sistem pesanan
+- (TERTUNDA) Membuat endpoint pembuatan transaksi QRIS melalui Duitku (menggantikan Midtrans)
+- (TERTUNDA) Mengimplementasikan endpoint webhook untuk notifikasi pembayaran dari Duitku
+- (TERTUNDA) Menghubungkan proses pembayaran dengan sistem pesanan
 
 ## Fase 1.7: Implementasi Endpoint Admin Backend
 - Membuat endpoint untuk manajemen menu (CRUD)
@@ -48,7 +48,8 @@ Backend aplikasi pemesanan makanan telah selesai diimplementasikan melalui 8 sub
 - Framework: Hono
 - Database: PostgreSQL
 - ORM: Drizzle ORM
-- Pembayaran: Midtrans
+- Pembayaran: Duitku (akan menggantikan Midtrans) - Dokumentasi: https://docs.duitku.com/
 - Real-time: WebSocket
+- Logging: Pino
 
 Backend telah sepenuhnya diimplementasikan sesuai dengan spesifikasi teknis dan siap untuk integrasi dengan frontend.

@@ -74,7 +74,7 @@ GET {{base_url}}/api/v1/orders/{{order_uid}} HTTP/1.1
 GET {{base_url}}/api/v1/admin/menu HTTP/1.1
 Authorization: Bearer {{auth_token}}
 
-@auth_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsInVzZXJuYW1lIjoibmV3YWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjE2MTM3MTMsImV4cCI6MTc2MTcwMDExM30.8I3seALxZhrGu0C50uBjiFyqYbMtF8rFQzg7KZCM0xY
+@auth_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsInVzZXJuYW1lIjoibmV3YWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NjE2NDUyNDIsImV4cCI6MTc2MTczMTY0Mn0.g2Pim6hqg1x6iXvyKuT7JhQFQAPXwz8kuOrr3JI2zE8
 
 ### Menambahkan Menu Baru (Admin)
 # Endpoint: POST /api/v1/admin/menu

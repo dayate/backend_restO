@@ -35,6 +35,13 @@ Laporan ini menyajikan hasil analisis backend aplikasi RestoMenu, mencakup fitur
 - Tabel: menu_items, orders, order_items, payments, users
 - Relasi antar tabel telah dibuat
 
+### 6. Sistem Logging
+- Library logging pino telah diinstal dan dikonfigurasi
+- Middleware logging untuk mencatat request dan response telah dibuat
+- Logging telah diimplementasikan di semua endpoint penting
+- File log disimpan ke direktori logs (app.log dan error.log)
+- Error handler global telah diimplementasikan
+
 ### 6. File Setup
 - create-admin.ts - Skrip untuk membuat pengguna admin awal
 - create-menu.ts - Skrip untuk membuat daftar menu contoh
@@ -56,10 +63,12 @@ Laporan ini menyajikan hasil analisis backend aplikasi RestoMenu, mencakup fitur
 - Integrasi WebSocket dengan endpoint perubahan status pesanan
 - Integrasi WebSocket dengan endpoint konfirmasi pembayaran
 
-### 2. Endpoint Pembayaran (Fase 1.6)
-- Endpoint POST /api/v1/payments/qris untuk pembuatan transaksi QRIS melalui Midtrans
-- Endpoint POST /api/v1/webhooks/midtrans untuk menerima notifikasi dari Midtrans
-- File `src/utils/midtrans.ts` untuk konfigurasi integrasi Midtrans
+### 2. Endpoint Pembayaran Duitku (Fase 1.6)
+- Endpoint POST /api/v1/payments/qris untuk pembuatan transaksi QRIS melalui Duitku (menggantikan Midtrans)
+- Endpoint POST /api/v1/webhooks/duitku untuk menerima notifikasi dari Duitku
+- File `src/utils/duitku.ts` untuk konfigurasi integrasi Duitku
+- Implementasi sandbox Duitku untuk pengembangan
+- Dokumentasi resmi Duitku: https://docs.duitku.com/
 
 ## Bagian-bagian yang Perlu Perbaikan
 

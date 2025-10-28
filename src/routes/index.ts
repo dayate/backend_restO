@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 import { hashPassword } from '../utils/auth';
 import { sign } from 'jsonwebtoken';
 import { compare } from 'bcrypt';
+import logger from '../utils/logger';
 
 const app = new Hono();
 
@@ -25,6 +26,8 @@ app.get('/api/v1/orders/:order_uid', getOrderDetail);
 // Route admin register - TANPA otentikasi
 app.post('/api/v1/admin/register', async (c) => {
   try {
+    logger.info('Proses registrasi admin dimulai');
+    
     // Baca body sebagai text untuk menghindari error parsing langsung
     const rawBody = await c.req.text();
     
@@ -35,7 +38,11 @@ app.post('/api/v1/admin/register', async (c) => {
     try {
       requestData = JSON.parse(cleanBody);
     } catch (parseError) {
-      console.error('JSON Parse error during registration:', parseError);
+      logger.error({
+        msg: 'JSON Parse error during registration',
+        error: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      });
+      
       return c.json({
         success: false,
         message: 'Terjadi kesalahan saat parsing data JSON',
@@ -47,6 +54,11 @@ app.post('/api/v1/admin/register', async (c) => {
 
     // Validasi input
     if (!username || !password) {
+      logger.warn({
+        msg: 'Validasi gagal: Username dan password harus diisi',
+        username
+      });
+      
       return c.json({
         success: false,
         message: 'Username dan password harus diisi'
@@ -54,6 +66,11 @@ app.post('/api/v1/admin/register', async (c) => {
     }
 
     if (password.length < 6) {
+      logger.warn({
+        msg: 'Validasi gagal: Password harus minimal 6 karakter',
+        username
+      });
+      
       return c.json({
         success: false,
         message: 'Password harus minimal 6 karakter'
@@ -67,6 +84,11 @@ app.post('/api/v1/admin/register', async (c) => {
       .where(eq(users.username, username));
 
     if (existingUser.length > 0) {
+      logger.warn({
+        msg: 'Username sudah digunakan',
+        username
+      });
+      
       return c.json({
         success: false,
         message: 'Username sudah digunakan'
@@ -85,6 +107,12 @@ app.post('/api/v1/admin/register', async (c) => {
         role
       })
       .returning();
+
+    logger.info({
+      msg: 'Registrasi admin berhasil',
+      userId: newUser.id,
+      username: newUser.username
+    });
 
     // Buat token JWT
     const token = sign(
@@ -106,7 +134,19 @@ app.post('/api/v1/admin/register', async (c) => {
       message: 'Registrasi berhasil'
     });
   } catch (error) {
-    console.error('Error during registration:', error);
+    logger.error({
+      msg: 'Error during registration',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
+    // Juga log ke file error khusus
+    const errorLogger = (await import('../utils/errorLogger')).default;
+    errorLogger.error({
+      msg: 'Critical error during admin registration',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      username: username || 'unknown'
+    });
+    
     return c.json({
       success: false,
       message: 'Terjadi kesalahan saat registrasi',
@@ -119,6 +159,8 @@ app.post('/api/v1/admin/register', async (c) => {
 app.post('/api/v1/admin/login', async (c) => {
   let requestData;
   try {
+    logger.info('Proses login admin dimulai');
+    
     // Baca body sebagai text untuk menghindari error parsing langsung
     const rawBody = await c.req.text();
     
@@ -127,7 +169,11 @@ app.post('/api/v1/admin/login', async (c) => {
     
     requestData = JSON.parse(cleanBody);
   } catch (parseError) {
-    console.error('JSON Parse error during login:', parseError);
+    logger.error({
+      msg: 'JSON Parse error during login',
+      error: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+    });
+    
     return c.json({
       success: false,
       message: 'Terjadi kesalahan saat parsing data JSON',
@@ -139,6 +185,11 @@ app.post('/api/v1/admin/login', async (c) => {
 
   // Validasi input
   if (!username || !password) {
+    logger.warn({
+      msg: 'Validasi gagal: Username dan password harus diisi',
+      username
+    });
+    
     return c.json({
       success: false,
       message: 'Username dan password harus diisi'
@@ -152,6 +203,11 @@ app.post('/api/v1/admin/login', async (c) => {
     .where(eq(users.username, username));
 
   if (!user) {
+    logger.warn({
+      msg: 'Login gagal: Username tidak ditemukan',
+      username
+    });
+    
     return c.json({
       success: false,
       message: 'Username atau password salah'
@@ -161,6 +217,11 @@ app.post('/api/v1/admin/login', async (c) => {
   // Verifikasi password
   const isPasswordValid = await compare(password, user.passwordHash);
   if (!isPasswordValid) {
+    logger.warn({
+      msg: 'Login gagal: Password salah',
+      username
+    });
+    
     return c.json({
       success: false,
       message: 'Username atau password salah'
@@ -173,6 +234,12 @@ app.post('/api/v1/admin/login', async (c) => {
     process.env.JWT_SECRET || 'fallback_secret_key',
     { expiresIn: '24h' }
   );
+
+  logger.info({
+    msg: 'Login admin berhasil',
+    userId: user.id,
+    username: user.username
+  });
 
   return c.json({
     success: true,
